@@ -16,7 +16,8 @@ namespace MagicProjector
         static async Task Main(string[] args)
         {
             using var control = new Control("192.168.0.108", 3988);
-            await control.Connect();
+            using var source = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await control.Connect(source.Token);
 
             await control.Send(new Packet
             {
@@ -59,6 +60,11 @@ namespace MagicProjector
     {
         public const int HeaderLength = 20;
         public const int MagicNumber = 287475865;
+
+        public string Ip { get; set; }
+
+        public int Port { get; set; }
+
         public int HelloId { get; set; }
         public int Reserve { get; set; }
 
@@ -67,14 +73,17 @@ namespace MagicProjector
 
         public Control(string ip, int port)
         {
-            Client = new TcpClient(ip, port);
-            Stream = Client.GetStream();
+            Client = new TcpClient();
             Reserve = new Random().Next(1073741823);
             HelloId = 0;
+            Ip = ip;
+            Port = port;
         }
 
         public async Task Connect(CancellationToken cancellationToken = default)
         {
+            await Client.ConnectAsync(Ip, Port, cancellationToken);
+            Stream = Client.GetStream();
             await Send(new Packet
             {
                 Type = (int) Type.Hello,
@@ -87,8 +96,6 @@ namespace MagicProjector
             Debug.Assert(hello != null, nameof(hello) + " != null");
             Console.WriteLine(hello);
             HelloId = hello.HelloId;
-            
-            
         }
 
         public async Task Send(Packet packet, CancellationToken cancellationToken = default)
